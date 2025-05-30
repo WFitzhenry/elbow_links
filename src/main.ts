@@ -2,12 +2,6 @@ import { createElbowConnector } from './elbow-connector';
 import './styles.css';
 import { Box, Point } from './types';
 import {
-    GRID_SIZE,
-    isPointInAnyRectangle,
-    isPointInBounds,
-    rectangleByPoints,
-    rectanglesOverlap,
-    simplifyPath,
     snapPointToGrid,
   } from "./utils";
 
@@ -96,8 +90,8 @@ import {
             y: y - offsetY,
           });
           
-          dragging.x = Math.max(0, Math.min(canvas.width - dragging.w, snapped.x));
-          dragging.y = Math.max(0, Math.min(canvas.height - dragging.h, snapped.y));
+        dragging.x = Math.max(0, Math.min(canvas.width - dragging.w, snapped.x));
+        dragging.y = Math.max(0, Math.min(canvas.height - dragging.h, snapped.y));
         pathPoints = getElbowInputs()
         draw();
       }
