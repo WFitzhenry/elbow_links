@@ -1,12 +1,13 @@
 {
   "name": "elbow_links",
   "version": "1.0.0",
-  "main": "dist/elbow-connecter.js",
   "scripts": {
-    "build": "tsc",
-    "start": "node dist/elbow-connecter.js"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vite": "^5.0.0"
   }
 }

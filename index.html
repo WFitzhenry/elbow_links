@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Elbow Connector</title>
+  <link rel="stylesheet" href="styles.css" />
+  <script type="module" src="/src/main.ts"></script>
+</head>
+<body>
+  <main class="container">
+    <article>
+      <h1>Elbow Links</h1>
+
+      <section>
+        <p>
+          This post explores elbow connector systematically. Elbow connector is a common UI pattern in whiteboard apps. A TypeScript implementation is available on <a href="https://github.com/wangzuo/elbow-connector">GitHub</a>. Below is a demo of the implementation; try switching mode and dragging rectangles and circles to see how the elbow connector automatically adjusts its path.
+        </p>
+        <div class="demo-wrapper">
+            <canvas id="elbowCanvas">
+              Your browser does not support the HTML5 canvas tag.
+            </canvas>
+        </div>
+      </section>
+
+      <section>
+        <h2>The Problem</h2>
+        <p>
+          "Elbow connector", or "right angle connector", connects elements using only horizontal and vertical segments. Despite its common use in whiteboard apps and diagramming tools, there is no formal specification for this pattern. This post aims to formalize the definition of elbow connector based on experience with various applications.
+        </p>
+        <p>
+            The task is to connect two points (p1, p2) using only vertical and horizontal segments. Optionally, these points might be associated with rectangles (rect1, rect2). The goal is to produce a list of points defining a connector path, implemented in a function signature like this:
+        </p>
+        <pre>
+            <code>
+            createElbowConnector(
+                p1: Point,
+                p2: Point,
+                rect1?: Rectangle,
+                rect2?: Rectangle,
+                ): Point[]
+            </code>
+        </pre>
+        <p>
+            Finding the optimal path isn't straightforward; it often relies on heuristics aimed at achieving a visually pleasing and natural feel. Implementations can vary across different applications.
+        </p>
+        <div class="image-row">
+            <figure>
+              <img src="./public/images/reactflow.png" alt="React Flow">
+              <figcaption>React Flow</figcaption>
+            </figure>
+            <figure>
+              <img src="./public/images/google.png" alt="Google Drawings">
+              <figcaption>Google Drawings</figcaption>
+            </figure>
+            <figure>
+              <img src="./public/images/fig.png" alt="FigJam">
+              <figcaption>FigJam</figcaption>
+            </figure>
+          </div>
+      </section>
+      <p>
+        Looking at these implementations, an initial idea is to avoid overlap with the rectangles. React Flow, a popular library for building node-based applications, seems not to consider this. Google Drawings encounters issues in certain corner cases, while FigJam strictly avoids overlap. Both Google Drawings and FigJam likely involve pathfinding, potentially at the cost of implementation simplicity, whereas React Flow opts for simpler path generation. Does FigJam look better than React Flow? Opinions may vary, which complicates finding a formal definition for elbow connectors. This post will focus on the FigJam version since it is less discussed, more challenging to build, and common in other whiteboard apps.
+      </p>
+
+      <section>
+        <h2>Pathfinding</h2>
+        <p>
+            Althought there are only two points and at most two rectangles to consider, listing all possible cases is still out of control, especially in cases like the FigJam example above. A more systematic definition is needed. Inspired by FigJam, a starting point is to seek the shortest path that avoids overlapping rectangles. The path distance relates to the Manhattan distance (or taxicab distance), measuring distance via horizontal and vertical moves only. Finding such shortest paths on a grid while avoiding obstacles is a classic application of the Breadth-First Search (BFS) algorithm. A small gap is maintained between the path and the rectangles, hardcoded as the grid snap size. For grid-based pathfinding like BFS, coordinates are often snapped to a grid, where the snap size represents the minimum movement distance.        </p>
+
+        <div class="image-row">
+            <figure>
+                <img src="./public/images/offset.png" alt="Offset">
+                <figcaption>Pathfinding with an offset (red segment) from the rectangle</figcaption>
+            </figure>
+        </div>
+
+            <p>However, multiple shortest paths may exist. Paths with fewer turns looked more pleasing. It's easy to extend BFS to track the number of turns and select the path with fewer turns in case of equal path lengths.</p>
+        <div class="image-row">
+            <figure>
+                <img src="./public/images/turns.png" alt="Turns">
+                <!-- <figcaption>Pathfinding with an offset (red segment) from the rectangle</figcaption> -->
+            </figure>
+        </div>
+      <p>Minimizing turns alone isn't sufficient. Consider the following scenario where both paths are the shortest and have the same number of turns, yet one feels more "balanced":</p>
+        
+      <div class="image-row">
+        <figure>
+            <img src="./public/images/balance.png" alt="Balance">
+            <!-- <figcaption>Pathfinding with an offset (red segment) from the rectangle</figcaption> -->
+        </figure>
+    </div>
+
+    <p>This "balance" can be formalized by seeking the path with the minimal maximum segment length. Among all shortest paths with the fewest turns, select the one where the longest single horizontal or vertical segment is as short as possible. However, tracking this in BFS can be challenging unless all paths are found. In my implementation, a post-processing step is added to balance the path by adjusting points within the spaces between two rectangles.
+
+        To summarize, the elbow connector can be defined as follows:</p>
+    
+    <pre>
+        <code>
+    1. The shortest path using only horizontal/vertical segments, avoiding rectangles overlap (except at endpoints).
+    2. Among those, the one with the minimal number of turns.
+    3. Among those, the one with the minimal maximum segment length.
+        </code>
+    </pre>
+    </section>
+
+      <section>
+        <h2>Other States</h2>
+        <p>
+          As mentioned earlier, the elbow connector can exist in unconnected or half-connected states. These variations are important to consider in different application contexts.
+        </p>
+        <div class="image-row">
+            <figure>
+                <img src="./public/images/states.png" alt="States">
+
+            </figure>
+        </div>
+        <p>They appear to violate our "minimal turns" rule. However, I found that these cases can be handled by introducing virtual rectangles representing potential connection targets.</p>
+
+        <div class="image-row">
+            <figure>
+                <img src="./public/images/virt.png" alt="Virtual Rectangles">
+            </figure>
+        </div>
+        <p>
+            In the unconnected case, the preferred orientation, either vertical or horizontal, depends on which distance is greater: the horizontal or the vertical distance between the two points. In the right example, the connector may feel unnatural without visual rectangles as cues.
+        </p>
+
+        <div class="image-row">
+            <figure>
+                <img src="./public/images/orientation.png" alt="orientation">
+            </figure>
+        </div>
+
+        <p>The case of partially connected shapes is more complex, as the preferred orientation depends on the starting point's position on the rectangle. For instance, comparing the middle example and right example, when p1 is located on the bottom edge of the rectangle and p2 is above p1, the vertical orientation looks better even the horizontal distance between two points is larger than the vertical distance.</p>
+     
+        <div class="image-row">
+            <figure>
+                <img src="./public/images/balanced.png" alt="balanced">
+            </figure>
+        </div>
+    
+        <p>
+            These special cases can be identified by determining whether the rectangle defined byp1 and p2 overlap with rectangle rect1 or rect2, as illustrated in Case 1 and Case 2 below. It turns out these cases lead to shortest path with minimal turns, enabling reuse of previous pathfinding algorithm instead of manually creating virtual rectangles. When there is no overlap between the rectangles, virtual rectangles can be created following the unconnected case.
+        </p>
+
+        <div class="image-row">
+            <figure>
+                <img src="./public/images/balanced.png" alt="balanced">
+            </figure>
+        </div>
+    
+    </section>
+    <section>
+        <h2>Conclusion</h2>
+        <p>
+            While elbow connectors are ubiquitous, there lacks a widely agreed-upon definition or even an attempt to define it. 
+            I hope this post provides a useful summary and exploration of this UI pattern. 
+            To cover all cases, the proposed strategy may seem over-engineered, but it still helps to simplify the implementation compared to hardcoding each case. 
+            One limitation is the assumption of a discrete grid and potential performance costs for pathfinding in large spaces, which I will try to address in future work. 
+            The source code is available on <a href="https://github.com/WFitzhenry/elbow_links" target="_blank" rel="noopener noreferrer">Github Repo</a>, and all feedback on this post and code is welcome via GitHub issues.
+        </p>
+    </section>
+    </article>
+  </main>
+</body>
+</html>
+
+
